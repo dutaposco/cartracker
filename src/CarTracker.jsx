@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ============================================================
 // KONFIGURASI
@@ -388,17 +387,22 @@ function AIChatHub({ onClose }) {
     setLoading(true);
 
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const result = await model.generateContent(input);
-      const response = await result.response;
-      const text = response.text();
-
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: userMsg.content }] }]
+          }),
+        }
+      );
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Tidak ada jawaban dari AI.';
       setMessages(prev => [...prev, { role: 'ai', content: text }]);
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'ai', content: "Maaf, ada error koneksi API. Cek log atau kunci API kamu." }]);
+      setMessages(prev => [...prev, { role: 'ai', content: 'Maaf, ada error koneksi. Cek API key atau koneksi internet kamu.' }]);
     }
     setLoading(false);
   };
