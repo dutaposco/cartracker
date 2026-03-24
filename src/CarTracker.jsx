@@ -142,7 +142,7 @@ export default function CarTracker() {
       <nav className="navbar">
         <div className="nav-inner">
           <div className="nav-logo-wrap">
-            <span className="nav-logo">DUTA CAR TRACKER</span>
+            <span className="nav-logo">DUTA CAR SAVINGS</span>
           </div>
           <button className="nav-btn" onClick={() => handleShowForm()}>+ Entry</button>
         </div>
