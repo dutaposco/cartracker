@@ -12,7 +12,7 @@ const CAR_IMAGE = 'https://byd.arista-group.co.id/wp-content/uploads/2025/07/Att
 const TABLE_NAME = 'byd_savings';
 
 // Masukkan Gemini API Key di .env kamu dengan nama VITE_GEMINI_API_KEY
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API || "";
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API || import.meta.env.VITE_GROQ_API_KEY || "";
 
 // ============================================================
 // HELPERS
@@ -376,8 +376,8 @@ function AIChatHub({ onClose }) {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
-    if (!GEMINI_API_KEY) {
-      alert("API KEY Gemini belum diset di .env!");
+    if (!GROQ_API_KEY) {
+      alert("API KEY Groq belum diset di .env! Isi VITE_GROQ_API");
       return;
     }
 
@@ -387,22 +387,21 @@ function AIChatHub({ onClose }) {
     setLoading(true);
 
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: userMsg.content }] }]
-          }),
-        }
-      );
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg.content }),
+      });
       const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Tidak ada jawaban dari AI.';
-      setMessages(prev => [...prev, { role: 'ai', content: text }]);
+      if (data?.error) {
+        setMessages(prev => [...prev, { role: 'ai', content: `Error: ${data.error}` }]);
+      } else {
+        const text = data?.choices?.[0]?.message?.content || 'Tidak ada jawaban.';
+        setMessages(prev => [...prev, { role: 'ai', content: text }]);
+      }
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'ai', content: 'Maaf, ada error koneksi. Cek API key atau koneksi internet kamu.' }]);
+      setMessages(prev => [...prev, { role: 'ai', content: `Koneksi gagal: ${err.message}` }]);
     }
     setLoading(false);
   };
