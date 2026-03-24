@@ -394,7 +394,8 @@ function AIChatHub({ onClose }) {
       });
       const data = await res.json();
       if (data?.error) {
-        setMessages(prev => [...prev, { role: 'ai', content: `Error: ${data.error}` }]);
+        const errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
+        setMessages(prev => [...prev, { role: 'ai', content: `Eror Sistem: ${errorMsg}` }]);
       } else {
         const text = data?.choices?.[0]?.message?.content || 'Tidak ada jawaban.';
         setMessages(prev => [...prev, { role: 'ai', content: text }]);
