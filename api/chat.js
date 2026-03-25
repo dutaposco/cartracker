@@ -10,8 +10,10 @@ export default async function handler(req, res) {
     if (!apiKey) return res.status(500).json({ error: 'SERVER_ERROR: API Key tidak ditemukan di Vercel!' });
 
     try {
-        const { message } = req.body || {};
-        if (!message) return res.status(400).json({ error: 'Message is required' });
+        const { message, messages } = req.body || {};
+        if (!message && !messages) return res.status(400).json({ error: 'Message or messages is required' });
+
+        const chatMessages = messages || [{ role: 'user', content: message }];
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: message }],
+                messages: chatMessages,
                 temperature: 0.7,
             })
         });
