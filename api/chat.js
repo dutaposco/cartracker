@@ -6,13 +6,13 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API;
     if (!apiKey) return res.status(500).json({ error: 'SERVER_ERROR: API Key tidak ditemukan di Vercel!' });
 
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ error: 'Message is required' });
-
     try {
+        const { message } = req.body || {};
+        if (!message) return res.status(400).json({ error: 'Message is required' });
+
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -26,9 +26,16 @@ export default async function handler(req, res) {
             })
         });
 
-        const data = await response.json();
-        if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Groq Error' });
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorJson;
+            try { errorJson = JSON.parse(errorText); } catch (e) { errorJson = null; }
+            return res.status(response.status).json({
+                error: errorJson?.error?.message || errorText || 'Groq Error'
+            });
+        }
 
+        const data = await response.json();
         return res.status(200).json(data);
     } catch (error) {
         return res.status(500).json({ error: `FETCH_ERROR: ${error.message}` });
