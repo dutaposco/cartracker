@@ -10,6 +10,7 @@ const CAR_VARIANT = 'Dynamic · 2026';
 const CAR_PRICE = 199000000;
 const CAR_IMAGE = 'https://byd.arista-group.co.id/wp-content/uploads/2025/07/Atto-1-Cosmos-Black.png';
 const TABLE_NAME = 'byd_savings';
+const TABLE_CHAT_HISTORY = 'chat_history';
 
 // Masukkan Gemini API Key di .env kamu dengan nama VITE_GEMINI_API_KEY
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API || import.meta.env.VITE_GROQ_API_KEY || "";
@@ -335,7 +336,7 @@ export default function CarTracker() {
         .chat-container { flex: 1; overflow-y: auto; padding: 30px 20px; display: flex; flex-direction: column; gap: 24px; }
         .msg { max-width: 85%; padding: 16px 20px; border-radius: 20px; font-size: 15px; line-height: 1.6; }
         .msg-user { align-self: flex-end; background: #111; color: #fff; border-bottom-right-radius: 4px; border: 1px solid #222; }
-        .msg-ai { align-self: flex-start; background: #000; color: #fff; border-bottom-left-radius: 4px; border: 1px solid #111; }
+        .msg-assistant { align-self: flex-start; background: #000; color: #fff; border-bottom-left-radius: 4px; border: 1px solid #111; }
         
         .chat-input-area { padding: 24px; background: #050505; border-top: 1px solid #111; }
         .input-wrap { max-width: 800px; margin: 0 auto; position: relative; display: flex; gap: 12px; }
@@ -369,8 +370,25 @@ function AIChatHub({ onClose }) {
   const scrollRef = useRef(null);
 
   useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    const { data, error } = await supabase
+      .from(TABLE_CHAT_HISTORY)
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error("Gagal ambil history:", error);
+    } else {
+      setMessages(data || []);
+    }
+  };
+
+  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  }, [messages, loading]);
 
   const onSend = async (e) => {
     e.preventDefault();
@@ -381,28 +399,46 @@ function AIChatHub({ onClose }) {
       return;
     }
 
-    const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
+    const userMsg = { role: 'user', content: input.trim() };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput('');
     setLoading(true);
+
+    // 1. Simpan pesan USER ke Supabase
+    await supabase.from(TABLE_CHAT_HISTORY).insert([userMsg]);
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.content }),
+        body: JSON.stringify({ messages: newMessages }),
       });
-      const data = await res.json();
-      if (data?.error) {
-        const errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
-        setMessages(prev => [...prev, { role: 'ai', content: `Eror Sistem: ${errorMsg}` }]);
+      if (!res.ok) {
+        const errorText = await res.text();
+        const aiErrorMsg = { role: 'assistant', content: `Eror Server (${res.status}): ${errorText || 'Pesan kosong dari server.'}` };
+        setMessages(prev => [...prev, aiErrorMsg]);
+        await supabase.from(TABLE_CHAT_HISTORY).insert([aiErrorMsg]);
       } else {
-        const text = data?.choices?.[0]?.message?.content || 'Tidak ada jawaban.';
-        setMessages(prev => [...prev, { role: 'ai', content: text }]);
+        const data = await res.json();
+        if (data?.error) {
+          const errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
+          const aiErrorMsg = { role: 'assistant', content: `Eror Sistem: ${errorMsg}` };
+          setMessages(prev => [...prev, aiErrorMsg]);
+          await supabase.from(TABLE_CHAT_HISTORY).insert([aiErrorMsg]);
+        } else {
+          const text = data?.choices?.[0]?.message?.content || 'Tidak ada jawaban.';
+          const aiMsg = { role: 'assistant', content: text };
+          setMessages(prev => [...prev, aiMsg]);
+          // 2. Simpan respon AI ke Supabase
+          await supabase.from(TABLE_CHAT_HISTORY).insert([aiMsg]);
+        }
       }
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'ai', content: `Koneksi gagal: ${err.message}` }]);
+      const aiErrorMsg = { role: 'assistant', content: `Koneksi gagal: ${err.message}` };
+      setMessages(prev => [...prev, aiErrorMsg]);
+      await supabase.from(TABLE_CHAT_HISTORY).insert([aiErrorMsg]);
     }
     setLoading(false);
   };
@@ -417,7 +453,7 @@ function AIChatHub({ onClose }) {
       <div className="ai-header">
         <div className="ai-title-wrap">
           <span className="ai-badge">CORE</span>
-          <span className="ai-title">DUTA AI HUB</span>
+          <span className="ai-title">DUTA AI</span>
         </div>
         <button className="btn-close-ai" onClick={onClose}>Tutup ×</button>
       </div>
@@ -441,7 +477,7 @@ function AIChatHub({ onClose }) {
             </motion.div>
           ))
         )}
-        {loading && <div className="msg msg-ai">Sedang mengetik...</div>}
+        {loading && <div className="msg msg-assistant">Sedang mengetik...</div>}
       </div>
 
       <div className="chat-input-area">
