@@ -412,7 +412,9 @@ function AIChatHub({ onClose }) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
+        }),
       });
       if (!res.ok) {
         const errorText = await res.text();
