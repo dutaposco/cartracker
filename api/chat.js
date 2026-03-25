@@ -14,6 +14,10 @@ export default async function handler(req, res) {
         if (!message && !messages) return res.status(400).json({ error: 'Message or messages is required' });
 
         const chatMessages = messages || [{ role: 'user', content: message }];
+        const sanitizedMessages = chatMessages.map(m => ({
+            role: m.role === 'ai' ? 'assistant' : m.role,
+            content: m.content
+        }));
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -23,7 +27,7 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
-                messages: chatMessages,
+                messages: sanitizedMessages,
                 temperature: 0.7,
             })
         });
